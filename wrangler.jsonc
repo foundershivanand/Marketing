@@ -1,0 +1,51 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "launchpilot",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-11-07",
+  "compatibility_flags": ["nodejs_compat"],
+  "browser": {
+    "binding": "BROWSER"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "launchpilot-db",
+      "database_id": "launchpilot-db-id",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ASSETS",
+      "bucket_name": "launchpilot-assets"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "SUBMISSIONS",
+        "queue": "launchpilot-submissions"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "launchpilot-submissions",
+        "max_batch_size": 1,
+        "max_retries": 5,
+        "dead_letter_queue": "launchpilot-dlq"
+      }
+    ]
+  },
+  "workflows": [
+    {
+      "name": "campaign-workflow",
+      "binding": "CAMPAIGN_WORKFLOW",
+      "class_name": "CampaignWorkflow"
+    }
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "STATIC_ASSETS"
+  }
+}
