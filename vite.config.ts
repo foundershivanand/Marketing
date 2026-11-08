@@ -12,8 +12,9 @@ export default defineConfig({
         server.middlewares.use(async (req, res, next) => {
           if (req.url && req.url.startsWith('/api')) {
             try {
-              // Dynamically import the worker app
-              const { app } = await server.ssrLoadModule('/src/worker/index.ts');
+              // Dynamically import the worker app from root
+              const workerPath = path.resolve(__dirname, 'src/worker/index.ts');
+              const { app } = await server.ssrLoadModule(workerPath);
               const protocol = req.headers['x-forwarded-proto'] || 'http';
               const host = req.headers.host || 'localhost:5173';
               const fullUrl = `${protocol}://${host}${req.url}`;
