@@ -15,7 +15,7 @@ export class ProductsRepository {
 
     const socialLinksJson = JSON.stringify(input.social_links || {});
     const factsJson = JSON.stringify(input.facts || []);
-    const prohibitedClaimsJson = JSON.stringify(input.prohibited_claims || []);
+    const prohibitedClaimsJson = JSON.stringify(input.prohibited_claims || (input as any).negative_constraints || []);
 
     await this.db.prepare(
       `INSERT INTO products (

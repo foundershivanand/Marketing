@@ -109,8 +109,79 @@ export class DestinationsRepository {
     }
 
     sql += ` ORDER BY confidence DESC, name ASC`;
+    if (filter?.limit) {
+      sql += ` LIMIT ?`;
+      params.push(filter.limit);
+      if (filter?.offset !== undefined) {
+        sql += ` OFFSET ?`;
+        params.push(filter.offset);
+      }
+    }
     const res = await this.db.prepare(sql).bind(...params).all<Destination>();
     return res.results || [];
+  }
+
+  // Rate Limiting & Throttles
+  async getThrottle(destinationId: string): Promise<any | null> {
+    return this.db.prepare(
+      `SELECT * FROM destination_throttles WHERE destination_id = ?`
+    ).bind(destinationId).first();
+  }
+
+  async recordAttemptOutcome(
+    destinationId: string,
+    success: boolean,
+    isRateLimited: boolean = false
+  ): Promise<void> {
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const existing = await this.getThrottle(destinationId);
+
+    if (!existing) {
+      const consecutiveFailures = success ? 0 : 1;
+      let cooldownUntil: string | null = null;
+      let status = 'healthy';
+
+      if (isRateLimited) {
+        status = 'cooldown';
+        cooldownUntil = new Date(now.getTime() + 5 * 60 * 1000).toISOString(); // 5 min cooldown
+      } else if (!success) {
+        status = 'degraded';
+      }
+
+      await this.db.prepare(
+        `INSERT INTO destination_throttles (
+          destination_id, consecutive_failures, last_attempt_at,
+          cooldown_until, rate_limit_per_hour, active_concurrent, status, updated_at
+        ) VALUES (?, ?, ?, ?, 12, 0, ?, ?)`
+      ).bind(destinationId, consecutiveFailures, nowIso, cooldownUntil, status, nowIso).run();
+    } else {
+      let consecutiveFailures = success ? 0 : (existing.consecutive_failures || 0) + 1;
+      let cooldownUntil = existing.cooldown_until;
+      let status = 'healthy';
+
+      if (isRateLimited) {
+        status = 'cooldown';
+        // Exponential backoff: 5m, 15m, 60m
+        const mins = Math.min(60, 5 * Math.pow(2, Math.min(3, consecutiveFailures)));
+        cooldownUntil = new Date(now.getTime() + mins * 60 * 1000).toISOString();
+      } else if (consecutiveFailures >= 5) {
+        status = 'blocked';
+        cooldownUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      } else if (consecutiveFailures > 0) {
+        status = 'degraded';
+      }
+
+      await this.db.prepare(
+        `UPDATE destination_throttles SET
+          consecutive_failures = ?,
+          last_attempt_at = ?,
+          cooldown_until = ?,
+          status = ?,
+          updated_at = ?
+        WHERE destination_id = ?`
+      ).bind(consecutiveFailures, nowIso, cooldownUntil, status, nowIso, destinationId).run();
+    }
   }
 
   async updateStatus(id: string, status: DestinationStatus, confidence?: number, lastCheckedAt?: string): Promise<void> {

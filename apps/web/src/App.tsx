@@ -9,6 +9,7 @@ import { Submissions } from './pages/Submissions';
 import { Analytics } from './pages/Analytics';
 import { Agents } from './pages/Agents';
 import { Settings } from './pages/Settings';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { api } from './lib/api';
 
 export function App() {
@@ -82,14 +83,16 @@ export function App() {
         />
 
         <main className="flex-1">
-          {currentTab === 'dashboard' && <Dashboard onNavigate={setCurrentTab} />}
-          {currentTab === 'products' && <Products />}
-          {currentTab === 'destinations' && <Destinations />}
-          {currentTab === 'campaigns' && <Campaigns />}
-          {currentTab === 'submissions' && <Submissions />}
-          {currentTab === 'analytics' && <Analytics />}
-          {currentTab === 'agents' && <Agents />}
-          {currentTab === 'settings' && <Settings />}
+          <ErrorBoundary>
+            {currentTab === 'dashboard' && <Dashboard onNavigate={setCurrentTab} />}
+            {currentTab === 'products' && <Products />}
+            {currentTab === 'destinations' && <Destinations />}
+            {currentTab === 'campaigns' && <Campaigns />}
+            {currentTab === 'submissions' && <Submissions />}
+            {currentTab === 'analytics' && <Analytics />}
+            {currentTab === 'agents' && <Agents />}
+            {currentTab === 'settings' && <Settings />}
+          </ErrorBoundary>
         </main>
       </div>
     </div>

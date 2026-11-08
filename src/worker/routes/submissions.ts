@@ -3,6 +3,8 @@ import { getDatabase } from '../../lib/database/db';
 import { CampaignsRepository } from '../../lib/database/campaigns.repo';
 import { SubmissionsRepository } from '../../lib/database/submissions.repo';
 import { SubmissionWorkflow } from '../workflows/submission.workflow';
+import { DeadLetterQueueRepository } from '../../lib/database/dlq.repo';
+import { QueueProducer } from '../queue/producer';
 import { logAudit } from '../../lib/audit/logger';
 
 export const submissionsRouter = new Hono();
@@ -10,6 +12,12 @@ export const submissionsRouter = new Hono();
 submissionsRouter.get('/', async (c) => {
   const db = getDatabase(c.env);
   const status = c.req.query('status');
+  const limitParam = c.req.query('limit');
+  const pageParam = c.req.query('page');
+
+  const limit = limitParam ? Math.min(200, Math.max(1, parseInt(limitParam, 10))) : 100;
+  const page = pageParam ? Math.max(1, parseInt(pageParam, 10)) : 1;
+  const offset = (page - 1) * limit;
 
   let sql = `
     SELECT
@@ -41,10 +49,45 @@ submissionsRouter.get('/', async (c) => {
     sql += ` AND t.status = ?`;
     params.push(status);
   }
-  sql += ` ORDER BY t.updated_at DESC LIMIT 100`;
+  sql += ` ORDER BY t.updated_at DESC LIMIT ? OFFSET ?`;
+  params.push(limit, offset);
 
   const res = await db.prepare(sql).bind(...params).all();
   return c.json(res.results || []);
+});
+
+// Dead Letter Queue (DLQ) Management Endpoints
+submissionsRouter.get('/dlq', async (c) => {
+  const db = getDatabase(c.env);
+  const dlqRepo = new DeadLetterQueueRepository(db);
+  const status = c.req.query('status') || 'pending';
+  const items = await dlqRepo.list(status);
+  return c.json(items);
+});
+
+submissionsRouter.post('/dlq/:id/replay', async (c) => {
+  const db = getDatabase(c.env);
+  const dlqRepo = new DeadLetterQueueRepository(db);
+  const item = await dlqRepo.findById(c.req.param('id'));
+
+  if (!item) {
+    return c.json({ error: 'DLQ item not found' }, 404);
+  }
+
+  // Re-enqueue payload to Queue Producer
+  const producer = new QueueProducer(c.env);
+  const payload = JSON.parse(item.payload_json);
+  await producer.send(payload);
+
+  await dlqRepo.markStatus(item.id, 'replayed');
+  await logAudit(db, {
+    action: 'dlq_replayed',
+    resourceType: 'dead_letter_queue',
+    resourceId: item.id,
+    details: { targetId: item.target_id, campaignId: item.campaign_id },
+  });
+
+  return c.json({ success: true, message: 'Message re-queued successfully' });
 });
 
 submissionsRouter.post('/targets/:id/execute', async (c) => {

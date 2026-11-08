@@ -27,14 +27,52 @@ app.use('/api/products/*', authMiddleware);
 app.use('/api/campaigns/*', authMiddleware);
 app.use('/api/destinations/:id/verify', authMiddleware);
 
-// Health Check
-app.get('/api/health', (c) => {
+// Health Check & Diagnostic Status
+app.get('/api/health', async (c) => {
+  const db = getDatabase(c.env);
+  let dbStatus = 'ok';
+  let dbLatencyMs = 0;
+
+  try {
+    const start = Date.now();
+    await db.prepare('SELECT 1').first();
+    dbLatencyMs = Date.now() - start;
+  } catch (err: any) {
+    dbStatus = `error: ${err.message}`;
+  }
+
+  const memoryUsage = typeof process !== 'undefined' && process.memoryUsage ? process.memoryUsage() : null;
+
   return c.json({
-    status: 'ok',
+    status: dbStatus === 'ok' ? 'ok' : 'degraded',
     app: 'LaunchPilot',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
+    database: {
+      status: dbStatus,
+      latency_ms: dbLatencyMs,
+    },
+    system: {
+      uptime_seconds: typeof process !== 'undefined' && process.uptime ? Math.round(process.uptime()) : null,
+      heap_used_mb: memoryUsage ? Math.round(memoryUsage.heapUsed / 1024 / 1024) : null,
+      ai_provider: ((c.env as any)?.AI_PROVIDER || process.env.AI_PROVIDER || 'mock').toLowerCase(),
+    },
   });
+});
+
+// Global Defensive Error Handler - Guarantees Server Never Crashes Uncaught
+app.onError((err, c) => {
+  console.error(`[LaunchPilot Worker Global Error] ${c.req.method} ${c.req.url}:`, err);
+  return c.json(
+    {
+      error: err.message || 'An unexpected internal server error occurred',
+      status: 'error',
+      code: (err as any).code || 'INTERNAL_ERROR',
+      timestamp: new Date().toISOString(),
+      path: c.req.path,
+    },
+    500
+  );
 });
 
 // API Routes

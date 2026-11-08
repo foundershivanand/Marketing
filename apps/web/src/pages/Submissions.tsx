@@ -16,6 +16,8 @@ export const Submissions: React.FC = () => {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null);
   const [interventionModal, setInterventionModal] = useState<any | null>(null);
 
@@ -129,7 +131,7 @@ export const Submissions: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-normal">
-                {submissions.map((sub) => (
+                {submissions.slice((page - 1) * pageSize, page * pageSize).map((sub) => (
                   <tr key={sub.target_id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-4">
                       <div className="font-semibold text-slate-900 flex items-center gap-1.5">
@@ -218,6 +220,36 @@ export const Submissions: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Scalable Submissions Pagination Bar */}
+        {submissions.length > pageSize && (
+          <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600 bg-slate-50/50">
+            <div>
+              Showing <span className="font-semibold text-slate-900">{(page - 1) * pageSize + 1}</span> to{' '}
+              <span className="font-semibold text-slate-900">{Math.min(page * pageSize, submissions.length)}</span> of{' '}
+              <span className="font-semibold text-slate-900">{submissions.length}</span> targets
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 rounded-md bg-white border border-slate-200 font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Previous
+              </button>
+              <span className="px-2 font-mono text-slate-500">
+                Page {page} of {Math.ceil(submissions.length / pageSize)}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(Math.ceil(submissions.length / pageSize), p + 1))}
+                disabled={page >= Math.ceil(submissions.length / pageSize)}
+                className="px-3 py-1.5 rounded-md bg-white border border-slate-200 font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

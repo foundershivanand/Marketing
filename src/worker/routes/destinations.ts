@@ -16,6 +16,12 @@ destinationsRouter.get('/', async (c) => {
   const automation_policy = c.req.query('automation_policy') as any;
   const pricing_type = c.req.query('pricing_type') as any;
   const search = c.req.query('search');
+  const limitParam = c.req.query('limit');
+  const pageParam = c.req.query('page');
+
+  const limit = limitParam ? Math.min(200, Math.max(1, parseInt(limitParam, 10))) : undefined;
+  const page = pageParam ? Math.max(1, parseInt(pageParam, 10)) : 1;
+  const offset = limit ? (page - 1) * limit : undefined;
 
   const destinations = await repo.list({
     category,
@@ -23,9 +29,18 @@ destinationsRouter.get('/', async (c) => {
     automation_policy,
     pricing_type,
     search,
+    limit,
+    offset,
   });
 
   return c.json(destinations);
+});
+
+destinationsRouter.get('/:id/throttle', async (c) => {
+  const db = getDatabase(c.env);
+  const repo = new DestinationsRepository(db);
+  const throttle = await repo.getThrottle(c.req.param('id'));
+  return c.json(throttle || { status: 'healthy', consecutive_failures: 0 });
 });
 
 destinationsRouter.get('/stats', async (c) => {

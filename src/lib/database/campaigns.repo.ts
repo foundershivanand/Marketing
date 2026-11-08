@@ -4,10 +4,18 @@ import { Campaign, CampaignSettings, CampaignTarget, ContentVariant, CampaignTar
 export class CampaignsRepository {
   constructor(private db: DatabaseClient) {}
 
-  async create(productId: string, name: string, settings: CampaignSettings): Promise<Campaign> {
+  async create(productId: string, name: string, settings?: Partial<CampaignSettings>): Promise<Campaign> {
     const id = 'camp_' + crypto.randomUUID().slice(0, 8);
     const now = new Date().toISOString();
-    const settingsJson = JSON.stringify(settings);
+    const defaultSettings: CampaignSettings = {
+      categories: ['startup_directory', 'launch_platform'],
+      include_paid: false,
+      include_reddit: false,
+      automation: 'maximum',
+      tracking: true,
+      ...(settings || {}),
+    };
+    const settingsJson = JSON.stringify(defaultSettings);
 
     await this.db.prepare(
       `INSERT INTO campaigns (id, product_id, name, status, settings_json, created_at)
@@ -26,8 +34,10 @@ export class CampaignsRepository {
     return res.results || [];
   }
 
-  async listAll(): Promise<Campaign[]> {
-    const res = await this.db.prepare(`SELECT * FROM campaigns ORDER BY created_at DESC`).all<Campaign>();
+  async listAll(limit = 100, offset = 0): Promise<Campaign[]> {
+    const res = await this.db.prepare(
+      `SELECT * FROM campaigns ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).bind(limit, offset).all<Campaign>();
     return res.results || [];
   }
 
@@ -64,6 +74,34 @@ export class CampaignsRepository {
     ).bind(id, campaignId, destinationId, adapterKey || null, submissionUrl || null, idempotencyKey, now, now).run();
 
     return (await this.findTarget(campaignId, destinationId))!;
+  }
+
+  async bulkAddTargets(
+    campaignId: string,
+    targets: Array<{ destinationId: string; adapterKey?: string; submissionUrl?: string }>
+  ): Promise<void> {
+    if (targets.length === 0) return;
+    const now = new Date().toISOString();
+    const chunkSize = 40;
+    for (let i = 0; i < targets.length; i += chunkSize) {
+      const chunk = targets.slice(i, i + chunkSize);
+      const valueClauses: string[] = [];
+      const params: any[] = [];
+
+      for (const t of chunk) {
+        const id = 'tgt_' + crypto.randomUUID().slice(0, 8);
+        const idempotencyKey = `idemp_${campaignId}_${t.destinationId}`;
+        valueClauses.push(`(?, ?, ?, 'pending', ?, ?, ?, ?, ?)`);
+        params.push(id, campaignId, t.destinationId, t.adapterKey || null, t.submissionUrl || null, idempotencyKey, now, now);
+      }
+
+      const sql = `INSERT OR IGNORE INTO campaign_targets (
+        id, campaign_id, destination_id, status, adapter_key,
+        submission_url, idempotency_key, created_at, updated_at
+      ) VALUES ${valueClauses.join(', ')}`;
+
+      await this.db.prepare(sql).bind(...params).run();
+    }
   }
 
   async findTarget(campaignId: string, destinationId: string): Promise<CampaignTarget | null> {

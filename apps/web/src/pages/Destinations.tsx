@@ -26,6 +26,8 @@ export const Destinations: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [policyFilter, setPolicyFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
 
   // Selected for drawer
   const [selectedDestination, setSelectedDestination] = useState<any | null>(null);
@@ -200,7 +202,7 @@ export const Destinations: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-normal">
-                {destinations.map((dest) => (
+                {destinations.slice((page - 1) * pageSize, page * pageSize).map((dest) => (
                   <tr key={dest.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-4">
                       <div className="font-semibold text-slate-900 flex items-center gap-1.5">
@@ -293,6 +295,36 @@ export const Destinations: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Scalable Pagination Bar */}
+        {destinations.length > pageSize && (
+          <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600 bg-slate-50/50">
+            <div>
+              Showing <span className="font-semibold text-slate-900">{(page - 1) * pageSize + 1}</span> to{' '}
+              <span className="font-semibold text-slate-900">{Math.min(page * pageSize, destinations.length)}</span> of{' '}
+              <span className="font-semibold text-slate-900">{destinations.length}</span> directories
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 rounded-md bg-white border border-slate-200 font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Previous
+              </button>
+              <span className="px-2 font-mono text-slate-500">
+                Page {page} of {Math.ceil(destinations.length / pageSize)}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(Math.ceil(destinations.length / pageSize), p + 1))}
+                disabled={page >= Math.ceil(destinations.length / pageSize)}
+                className="px-3 py-1.5 rounded-md bg-white border border-slate-200 font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

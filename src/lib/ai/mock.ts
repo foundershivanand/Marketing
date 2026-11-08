@@ -5,8 +5,8 @@ export class MockAIProvider implements AIProvider {
     const p = prompt.toLowerCase();
 
     // Research Agent prompt detection
-    if (p.includes("destination research agent") || p.includes("research one startup submission")) {
-      const isReddit = p.includes("reddit");
+    if (p.includes("destination research") || p.includes("research one startup") || p.includes("research agent")) {
+      const isReddit = /"category":\s*"reddit"/i.test(p) || p.includes("category: reddit") || p.includes("r/");
       return {
         active: true,
         official_submission_url: isReddit ? "https://www.reddit.com/r/SideProject/submit" : "https://www.producthunt.com/posts/new",
@@ -26,7 +26,7 @@ export class MockAIProvider implements AIProvider {
     }
 
     // Content Generation Agent prompt detection
-    if (p.includes("expert startup marketing copywriter") || p.includes("unique submission package")) {
+    if (p.includes("copywriter") || p.includes("unique submission package") || p.includes("content agent")) {
       return {
         title: "LaunchPilot — Multi-Product Startup Distribution Engine",
         tagline: "Automate startup launch submissions across 100+ platforms with AI",
@@ -55,8 +55,8 @@ export class MockAIProvider implements AIProvider {
     }
 
     // Planner Agent prompt detection
-    if (p.includes("submission planning agent") || p.includes("prepare an execution plan")) {
-      const isReddit = p.includes("reddit");
+    if (p.includes("submission planning") || p.includes("execution plan") || p.includes("planner")) {
+      const isReddit = /"category":\s*"reddit"/i.test(p) || p.includes("category: reddit") || p.includes("r/");
       return {
         selected_adapter: isReddit ? "reddit-draft" : "generic-form",
         eligibility: isReddit ? "review_required" : "eligible",

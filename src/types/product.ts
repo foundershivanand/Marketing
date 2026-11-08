@@ -44,6 +44,7 @@ export interface CreateProductInput {
   social_links?: Record<string, string>;
   facts?: string[];
   prohibited_claims?: string[]; // "Things AI must never claim"
+  negative_constraints?: string[]; // Alias for prohibited_claims
 }
 
 export interface UpdateProductInput extends Partial<CreateProductInput> {

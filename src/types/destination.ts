@@ -55,4 +55,17 @@ export interface DestinationFilter {
   automation_policy?: AutomationPolicy;
   pricing_type?: PricingType;
   search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface DestinationThrottle {
+  destination_id: string;
+  consecutive_failures: number;
+  last_attempt_at?: string;
+  cooldown_until?: string;
+  rate_limit_per_hour: number;
+  active_concurrent: number;
+  status: 'healthy' | 'degraded' | 'cooldown' | 'blocked';
+  updated_at?: string;
 }

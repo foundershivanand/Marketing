@@ -17,24 +17,46 @@ export interface DatabaseClient {
   exec(sql: string): Promise<void>;
 }
 
+function applyMigrations(sqlite: any): void {
+  try {
+    const migrationsDir = path.resolve(process.cwd(), 'migrations');
+    if (fs.existsSync(migrationsDir)) {
+      const files = fs.readdirSync(migrationsDir)
+        .filter((f: string) => f.endsWith('.sql'))
+        .sort();
+      for (const file of files) {
+        const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+        sqlite.exec(sql);
+      }
+    }
+  } catch (err) {
+    console.warn('Warning applying migrations to SQLite:', err);
+  }
+}
+
 export function createMemoryDatabase(): DatabaseClient {
   const { DatabaseSync } = require('node:sqlite');
   const memDb = new DatabaseSync(':memory:');
-  const migrationPath = path.resolve(process.cwd(), 'migrations/0001_initial_schema.sql');
-  if (fs.existsSync(migrationPath)) {
-    const sql = fs.readFileSync(migrationPath, 'utf8');
-    memDb.exec(sql);
-  }
+  applyMigrations(memDb);
   return createNodeSqliteAdapter(memDb);
 }
 
 // In-memory or file-backed Node SQLite instance for local development / testing
 let localNodeSqliteDb: any = null;
+let testMemoryDb: DatabaseClient | null = null;
 
 export function getDatabase(env?: any): DatabaseClient {
   // If running inside Cloudflare Worker with D1 binding
   if (env && env.DB && typeof env.DB.prepare === 'function') {
     return env.DB;
+  }
+
+  // In test environments, reuse a single test memory database per process
+  if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+    if (!testMemoryDb) {
+      testMemoryDb = createMemoryDatabase();
+    }
+    return testMemoryDb;
   }
 
   // Fallback to Node.js built-in SQLite
@@ -44,23 +66,13 @@ export function getDatabase(env?: any): DatabaseClient {
       const { DatabaseSync } = require('node:sqlite');
       const dbPath = path.resolve(process.cwd(), 'launchpilot-local.sqlite');
       localNodeSqliteDb = new DatabaseSync(dbPath);
-
-      // Read migration file and apply if needed
-      const migrationPath = path.resolve(process.cwd(), 'migrations/0001_initial_schema.sql');
-      if (fs.existsSync(migrationPath)) {
-        const sql = fs.readFileSync(migrationPath, 'utf8');
-        localNodeSqliteDb.exec(sql);
-      }
+      applyMigrations(localNodeSqliteDb);
     } catch (e) {
       console.warn('Failed to initialize local node:sqlite, falling back to memory database:', e);
       try {
         const { DatabaseSync } = require('node:sqlite');
         localNodeSqliteDb = new DatabaseSync(':memory:');
-        const migrationPath = path.resolve(process.cwd(), 'migrations/0001_initial_schema.sql');
-        if (fs.existsSync(migrationPath)) {
-          const sql = fs.readFileSync(migrationPath, 'utf8');
-          localNodeSqliteDb.exec(sql);
-        }
+        applyMigrations(localNodeSqliteDb);
       } catch (err2) {
         console.error('Fatal: Cannot initialize SQLite:', err2);
       }
