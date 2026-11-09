@@ -2,7 +2,22 @@ import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'node:module';
 
-const require = createRequire(import.meta.url);
+let nodeRequire: any = null;
+function getNodeRequire() {
+  if (!nodeRequire) {
+    try {
+      const base = (typeof import.meta !== 'undefined' && typeof import.meta.url === 'string' && import.meta.url.length > 0)
+        ? import.meta.url
+        : 'file:///app/index.js';
+      nodeRequire = createRequire(base);
+    } catch {
+      nodeRequire = (mod: string) => {
+        throw new Error(`Cannot require ${mod} in this environment`);
+      };
+    }
+  }
+  return nodeRequire;
+}
 
 export interface DatabaseStatement {
   bind(...params: any[]): DatabaseStatement;
@@ -35,7 +50,8 @@ function applyMigrations(sqlite: any): void {
 }
 
 export function createMemoryDatabase(): DatabaseClient {
-  const { DatabaseSync } = require('node:sqlite');
+  const req = getNodeRequire();
+  const { DatabaseSync } = req('node:sqlite');
   const memDb = new DatabaseSync(':memory:');
   applyMigrations(memDb);
   return createNodeSqliteAdapter(memDb);
@@ -63,14 +79,16 @@ export function getDatabase(env?: any): DatabaseClient {
   if (!localNodeSqliteDb) {
     try {
       // Dynamic require so CF worker packager doesn't complain
-      const { DatabaseSync } = require('node:sqlite');
+      const req = getNodeRequire();
+      const { DatabaseSync } = req('node:sqlite');
       const dbPath = path.resolve(process.cwd(), 'launchpilot-local.sqlite');
       localNodeSqliteDb = new DatabaseSync(dbPath);
       applyMigrations(localNodeSqliteDb);
     } catch (e) {
       console.warn('Failed to initialize local node:sqlite, falling back to memory database:', e);
       try {
-        const { DatabaseSync } = require('node:sqlite');
+        const req = getNodeRequire();
+        const { DatabaseSync } = req('node:sqlite');
         localNodeSqliteDb = new DatabaseSync(':memory:');
         applyMigrations(localNodeSqliteDb);
       } catch (err2) {

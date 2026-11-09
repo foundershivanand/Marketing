@@ -82,25 +82,21 @@ export class CampaignsRepository {
   ): Promise<void> {
     if (targets.length === 0) return;
     const now = new Date().toISOString();
-    const chunkSize = 40;
-    for (let i = 0; i < targets.length; i += chunkSize) {
-      const chunk = targets.slice(i, i + chunkSize);
-      const valueClauses: string[] = [];
-      const params: any[] = [];
 
-      for (const t of chunk) {
-        const id = 'tgt_' + crypto.randomUUID().slice(0, 8);
-        const idempotencyKey = `idemp_${campaignId}_${t.destinationId}`;
-        valueClauses.push(`(?, ?, ?, 'pending', ?, ?, ?, ?, ?)`);
-        params.push(id, campaignId, t.destinationId, t.adapterKey || null, t.submissionUrl || null, idempotencyKey, now, now);
-      }
+    const statements = targets.map((t) => {
+      const id = 'tgt_' + crypto.randomUUID().slice(0, 8);
+      const idempotencyKey = `idemp_${campaignId}_${t.destinationId}`;
+      return this.db.prepare(
+        `INSERT OR IGNORE INTO campaign_targets (
+          id, campaign_id, destination_id, status, adapter_key,
+          submission_url, idempotency_key, created_at, updated_at
+        ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)`
+      ).bind(id, campaignId, t.destinationId, t.adapterKey || null, t.submissionUrl || null, idempotencyKey, now, now);
+    });
 
-      const sql = `INSERT OR IGNORE INTO campaign_targets (
-        id, campaign_id, destination_id, status, adapter_key,
-        submission_url, idempotency_key, created_at, updated_at
-      ) VALUES ${valueClauses.join(', ')}`;
-
-      await this.db.prepare(sql).bind(...params).run();
+    const batchSize = 50;
+    for (let i = 0; i < statements.length; i += batchSize) {
+      await this.db.batch(statements.slice(i, i + batchSize));
     }
   }
 

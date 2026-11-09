@@ -11,16 +11,16 @@
     {
       "binding": "DB",
       "database_name": "launchpilot-db",
-      "database_id": "launchpilot-db-id",
+      "database_id": "9537ad2e-ad69-4f21-a1bb-f33c31771640",
       "migrations_dir": "migrations"
     }
   ],
-  "r2_buckets": [
-    {
-      "binding": "ASSETS",
-      "bucket_name": "launchpilot-assets"
-    }
-  ],
+  // "r2_buckets": [
+  //   {
+  //     "binding": "ASSETS",
+  //     "bucket_name": "launchpilot-assets"
+  //   }
+  // ],
   "queues": {
     "producers": [
       {

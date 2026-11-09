@@ -10,7 +10,7 @@ import { analyticsRouter } from './routes/analytics';
 import { importsRouter } from './routes/imports';
 import { QueueConsumer } from './queue/consumer';
 import { getDatabase } from '../lib/database/db';
-import { CampaignWorkflow } from './workflows/campaign.workflow';
+import { CampaignWorkflow as CampaignWorkflowService } from './workflows/campaign.workflow';
 import { getAIProvider } from '../lib/ai/factory';
 
 export const app = new Hono();
@@ -84,9 +84,12 @@ app.route('/api/analytics', analyticsRouter);
 app.route('/api/import', importsRouter);
 
 // Fallback for static assets or 404
-app.notFound((c) => {
+app.notFound(async (c) => {
   if (c.req.path.startsWith('/api')) {
     return c.json({ error: 'Endpoint not found', path: c.req.path }, 404);
+  }
+  if ((c.env as any)?.STATIC_ASSETS) {
+    return await (c.env as any).STATIC_ASSETS.fetch(c.req.raw);
   }
   return c.text('LaunchPilot API Server', 200);
 });
@@ -111,12 +114,15 @@ export default {
   },
 };
 
+import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers';
+
 // Export Workflow class for Cloudflare Workflows binding
-export class CloudflareCampaignWorkflow {
-  async run(event: any, step: any) {
-    const db = getDatabase(event.env);
-    const ai = getAIProvider(event.env);
-    const workflow = new CampaignWorkflow(db, ai, event.env);
+export class CampaignWorkflow extends WorkflowEntrypoint<any, any> {
+  async run(event: WorkflowEvent<any>, step: WorkflowStep) {
+    const env = this.env || (event as any).env;
+    const db = getDatabase(env);
+    const ai = getAIProvider(env);
+    const workflow = new CampaignWorkflowService(db, ai, env);
 
     return await step.do('run-campaign', async () => {
       return await workflow.runCampaign(event.payload.campaignId);
