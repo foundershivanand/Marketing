@@ -169,6 +169,17 @@ describe('LaunchPilot Worker REST API Suite', () => {
     expect(Array.isArray(data)).toBe(true);
   });
 
+  it('GET /api/submissions/targets/:id returns target detail and content variant', async () => {
+    if (!sampleTargetId) return;
+
+    const res = await app.request(`/api/submissions/targets/${sampleTargetId}`);
+    expect(res.status).toBe(200);
+    const data: any = await res.json();
+    expect(data.target).toBeDefined();
+    expect(data.target.id).toBe(sampleTargetId);
+    expect(data.destination).toBeDefined();
+  });
+
   it('POST /api/submissions/targets/:id/intervention records human intervention', async () => {
     if (!sampleTargetId) return;
 

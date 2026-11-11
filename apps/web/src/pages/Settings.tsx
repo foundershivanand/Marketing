@@ -3,10 +3,19 @@ import { Settings as SettingsIcon, Cloud, Cpu, Database, Shield, CheckCircle2, R
 import { api } from '../lib/api';
 
 export const Settings: React.FC = () => {
-  const [provider, setProvider] = useState('mock');
-  const [geminiKey, setGeminiKey] = useState('');
-  const [openaiKey, setOpenaiKey] = useState('');
+  const [provider, setProvider] = useState(() => localStorage.getItem('launchpilot_ai_provider') || 'mock');
+  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('launchpilot_gemini_key') || '');
+  const [openaiKey, setOpenaiKey] = useState(() => localStorage.getItem('launchpilot_openai_key') || '');
   const [seeding, setSeeding] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleSaveAIConfig = () => {
+    localStorage.setItem('launchpilot_ai_provider', provider);
+    localStorage.setItem('launchpilot_gemini_key', geminiKey);
+    localStorage.setItem('launchpilot_openai_key', openaiKey);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
 
   const handleSeedDemo = async () => {
     try {
@@ -180,6 +189,18 @@ export const Settings: React.FC = () => {
                 />
               </div>
             )}
+
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSaveAIConfig}
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs flex items-center gap-1.5 shadow-xs transition"
+              >
+                {saved ? <CheckCircle2 className="w-4 h-4" /> : <Cpu className="w-4 h-4" />}
+                <span>{saved ? 'Settings Saved to Browser' : 'Save AI Configuration'}</span>
+              </button>
+              {saved && <span className="text-emerald-700 text-xs font-medium">Preferences stored locally!</span>}
+            </div>
           </div>
         </div>
 
@@ -190,7 +211,7 @@ export const Settings: React.FC = () => {
             <span>Demo Data & Sandbox Seeder</span>
           </h3>
           <p className="text-slate-500">
-            One-click populate the database with the PlacesToPostYourStartup catalogue (100+ platforms), sample product profile, and initial campaign targets.
+            One-click populate the database with the comprehensive PlacesToPostYourStartup catalogue (290+ platforms), sample product profile, and initial campaign targets.
           </p>
 
           <button

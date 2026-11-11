@@ -72,6 +72,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@web': path.resolve(__dirname, './apps/web/src'),
+      'cloudflare:workers': path.resolve(__dirname, './src/worker/shims/cloudflare-workers.ts'),
     },
   },
   build: {

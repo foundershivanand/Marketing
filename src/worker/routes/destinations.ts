@@ -19,7 +19,7 @@ destinationsRouter.get('/', async (c) => {
   const limitParam = c.req.query('limit');
   const pageParam = c.req.query('page');
 
-  const limit = limitParam ? Math.min(200, Math.max(1, parseInt(limitParam, 10))) : undefined;
+  const limit = limitParam ? Math.min(500, Math.max(1, parseInt(limitParam, 10))) : undefined;
   const page = pageParam ? Math.max(1, parseInt(pageParam, 10)) : 1;
   const offset = limit ? (page - 1) * limit : undefined;
 

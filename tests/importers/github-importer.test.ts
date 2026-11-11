@@ -38,4 +38,36 @@ describe('GitHub Importer (PlacesToPostYourStartup)', () => {
     expect(redditSp?.category).toBe('reddit');
     expect(redditSp?.automation_policy).toBe('requires_review');
   });
+
+  it('imports the comprehensive PlacesToPostYourStartup catalogue without missing any sites', async () => {
+    const db = createMemoryDatabase();
+    const repo = new DestinationsRepository(db);
+    const importer = new GitHubImporter(repo);
+
+    const result = await importer.importFromGitHub();
+
+    expect(result.totalParsed).toBeGreaterThanOrEqual(200);
+    expect(result.redditCount).toBeGreaterThanOrEqual(19);
+    expect(result.websiteCount).toBeGreaterThanOrEqual(82);
+    expect(result.imported).toBeGreaterThanOrEqual(200);
+    expect(result.errors).toHaveLength(0);
+
+    // Verify key destinations from master, PRs, and history
+    const ph = await repo.findBySlug('product-hunt');
+    expect(ph).toBeDefined();
+    expect(ph?.category).toBe('launch_platform');
+
+    const redditSaas = await repo.findBySlug('reddit-saas');
+    expect(redditSaas).toBeDefined();
+    expect(redditSaas?.category).toBe('reddit');
+    expect(redditSaas?.automation_policy).toBe('requires_review');
+    expect(redditSaas?.adapter_key).toBe('reddit-draft');
+
+    const launchef = await repo.findBySlug('launchef');
+    expect(launchef).toBeDefined();
+    expect(launchef?.category).toBe('launch_platform');
+
+    const awesomeTools = await repo.findBySlug('awesome-tools');
+    expect(awesomeTools).toBeDefined();
+  });
 });

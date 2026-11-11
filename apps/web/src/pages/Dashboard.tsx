@@ -78,7 +78,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             Write Once. Distribute Everywhere. Measure Everything.
           </h2>
           <p className="text-slate-300 text-sm max-w-2xl leading-relaxed">
-            LaunchPilot deploys six specialized AI agents orchestrated by Cloudflare Workflows to research, adapt, and distribute your startup announcements across 100+ platforms without manual copy-pasting.
+            LaunchPilot deploys six specialized AI agents orchestrated by Cloudflare Workflows to research, adapt, and distribute your startup announcements across 290+ platforms without manual copy-pasting.
           </p>
         </div>
 
@@ -90,7 +90,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm flex items-center gap-2 shadow-lg shadow-emerald-950/50 transition-all disabled:opacity-50"
             >
               <DownloadCloud className="w-4 h-4" />
-              <span>{importing ? 'Importing...' : 'Import 100+ Destinations'}</span>
+              <span>{importing ? 'Importing...' : 'Import PlacesToPostYourStartup'}</span>
             </button>
           )}
 

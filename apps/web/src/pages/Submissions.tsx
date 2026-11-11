@@ -9,6 +9,9 @@ import {
   ShieldAlert,
   X,
   Check,
+  Copy,
+  Sparkles,
+  FileText,
 } from 'lucide-react';
 import { api } from '../lib/api';
 
@@ -20,11 +23,50 @@ export const Submissions: React.FC = () => {
   const pageSize = 20;
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null);
   const [interventionModal, setInterventionModal] = useState<any | null>(null);
+  const [targetDetail, setTargetDetail] = useState<any | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Intervention modal state
   const [manualUrl, setManualUrl] = useState('');
   const [notes, setNotes] = useState('');
   const [submittingAction, setSubmittingAction] = useState(false);
+
+  const copyText = (key: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleOpenIntervention = async (sub: any) => {
+    setInterventionModal(sub);
+    setManualUrl('');
+    setNotes('');
+    setTargetDetail(null);
+    setLoadingDetail(true);
+    try {
+      const detail = await api.getTargetDetail(sub.target_id);
+      setTargetDetail(detail);
+    } catch (err) {
+      console.error('Failed to load target details:', err);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const handleOpenDetails = async (sub: any) => {
+    setSelectedSubmission(sub);
+    setTargetDetail(null);
+    setLoadingDetail(true);
+    try {
+      const detail = await api.getTargetDetail(sub.target_id);
+      setTargetDetail(detail);
+    } catch (err) {
+      console.error('Failed to load target details:', err);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
 
   const loadSubmissions = async () => {
     try {
@@ -192,7 +234,7 @@ export const Submissions: React.FC = () => {
                     <td className="py-3 px-4 text-right space-x-2">
                       {sub.status === 'manual_action_required' && (
                         <button
-                          onClick={() => setInterventionModal(sub)}
+                          onClick={() => handleOpenIntervention(sub)}
                           className="px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-medium shadow-xs"
                         >
                           Review & Intervene
@@ -210,7 +252,7 @@ export const Submissions: React.FC = () => {
                       )}
 
                       <button
-                        onClick={() => setSelectedSubmission(sub)}
+                        onClick={() => handleOpenDetails(sub)}
                         className="px-2 py-1 rounded-md bg-white hover:bg-slate-50 text-slate-600 text-[11px] border border-slate-200"
                       >
                         Details
@@ -256,8 +298,8 @@ export const Submissions: React.FC = () => {
 
       {/* Human Intervention Modal */}
       {interventionModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 text-xs">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 text-xs my-8">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2 text-amber-600 font-bold text-sm">
                 <AlertCircle className="w-4 h-4" />
@@ -273,7 +315,7 @@ export const Submissions: React.FC = () => {
               <div>{interventionModal.error_message || 'Automated flow paused for founder review.'}</div>
             </div>
 
-            <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
               <div>
                 <span className="font-semibold text-slate-700">Destination:</span> {interventionModal.destination_name} ({interventionModal.destination_category})
               </div>
@@ -281,6 +323,91 @@ export const Submissions: React.FC = () => {
                 <span className="font-semibold text-slate-700">Product:</span> {interventionModal.product_name}
               </div>
             </div>
+
+            {/* AI-Prepared Draft Content Card */}
+            {loadingDetail ? (
+              <div className="p-4 text-center text-slate-400 text-xs">Loading AI draft & destination details...</div>
+            ) : targetDetail && (() => {
+              let attemptPayload: any = null;
+              try {
+                attemptPayload = targetDetail?.latestAttempt?.response_json
+                  ? JSON.parse(targetDetail.latestAttempt.response_json)
+                  : null;
+              } catch {}
+              const content = targetDetail?.content;
+              const draftTitle = attemptPayload?.recommendedTitle || attemptPayload?.preparedDraft?.title || content?.title;
+              const draftBody = attemptPayload?.recommendedBody || attemptPayload?.body || attemptPayload?.preparedDraft?.description || content?.body || content?.description;
+              const subreddit = attemptPayload?.subreddit;
+              const rulesReminder = attemptPayload?.rulesReminder;
+              const destinationUrl = targetDetail?.destination?.submission_url || targetDetail?.destination?.source_url || interventionModal.submission_url;
+
+              if (!draftTitle && !draftBody && !destinationUrl) return null;
+
+              return (
+                <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between text-slate-900 font-semibold text-xs">
+                    <span className="flex items-center gap-1.5 text-emerald-700">
+                      <Sparkles className="w-4 h-4 text-emerald-600" />
+                      AI-Prepared Submission Draft
+                    </span>
+                    {destinationUrl && (
+                      <a
+                        href={destinationUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1 underline font-mono"
+                      >
+                        Open {interventionModal.destination_name} <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                  </div>
+
+                  {draftTitle && (
+                    <div>
+                      <div className="flex items-center justify-between text-[11px] font-medium text-slate-600 mb-0.5">
+                        <span>Post Title / Name</span>
+                        <button
+                          type="button"
+                          onClick={() => copyText('title', draftTitle)}
+                          className="text-emerald-600 hover:text-emerald-700 flex items-center gap-1 text-[10px]"
+                        >
+                          {copiedKey === 'title' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedKey === 'title' ? 'Copied' : 'Copy Title'}</span>
+                        </button>
+                      </div>
+                      <div className="p-2 bg-white rounded border border-slate-200 font-mono text-[11px] select-all">
+                        {draftTitle}
+                      </div>
+                    </div>
+                  )}
+
+                  {draftBody && (
+                    <div>
+                      <div className="flex items-center justify-between text-[11px] font-medium text-slate-600 mb-0.5">
+                        <span>Body / Description Pitch</span>
+                        <button
+                          type="button"
+                          onClick={() => copyText('body', draftBody)}
+                          className="text-emerald-600 hover:text-emerald-700 flex items-center gap-1 text-[10px]"
+                        >
+                          {copiedKey === 'body' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedKey === 'body' ? 'Copied' : 'Copy Pitch'}</span>
+                        </button>
+                      </div>
+                      <div className="p-2.5 bg-white rounded border border-slate-200 whitespace-pre-wrap font-sans text-[11px] select-all max-h-36 overflow-y-auto">
+                        {draftBody}
+                      </div>
+                    </div>
+                  )}
+
+                  {rulesReminder && (
+                    <div className="text-[11px] text-amber-800 bg-amber-50/80 p-2 rounded border border-amber-200/60">
+                      <strong>Community Rules:</strong> {rulesReminder}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <div className="space-y-3 pt-2 border-t border-slate-100">
               <div>
@@ -370,6 +497,33 @@ export const Submissions: React.FC = () => {
               <div className="p-3 bg-red-50 rounded-lg border border-red-200 text-red-800">
                 <span className="font-semibold">Error / Policy Note:</span>
                 <div>{selectedSubmission.error_message}</div>
+              </div>
+            )}
+
+            {loadingDetail ? (
+              <div className="text-slate-400 py-4 text-center">Loading full details...</div>
+            ) : targetDetail && (
+              <div className="space-y-4 pt-3 border-t border-slate-100">
+                {targetDetail.content && (
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                    <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                      Generated Content Package
+                    </div>
+                    <div><span className="font-medium text-slate-700">Title:</span> {targetDetail.content.title}</div>
+                    <div><span className="font-medium text-slate-700">Tagline:</span> {targetDetail.content.tagline}</div>
+                    <div className="text-[11px] text-slate-600 line-clamp-3"><span className="font-medium text-slate-700">Short Description:</span> {targetDetail.content.description}</div>
+                  </div>
+                )}
+
+                {targetDetail.latestAttempt?.response_json && (
+                  <div className="space-y-1">
+                    <div className="font-semibold text-slate-800">Latest Execution Response:</div>
+                    <pre className="p-2.5 bg-slate-900 text-emerald-400 rounded-lg text-[10px] overflow-x-auto max-h-48 font-mono">
+                      {JSON.stringify(JSON.parse(targetDetail.latestAttempt.response_json), null, 2)}
+                    </pre>
+                  </div>
+                )}
               </div>
             )}
           </div>

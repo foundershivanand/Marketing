@@ -16,11 +16,15 @@ import { getAIProvider } from '../lib/ai/factory';
 export const app = new Hono();
 
 // Global Middlewares
-app.use('*', cors({
-  origin: '*',
-  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'CF-Access-Authenticated-User-Email'],
-}));
+app.use('*', async (c, next) => {
+  const allowedOrigin = (c.env as any)?.ALLOWED_ORIGIN || process.env.ALLOWED_ORIGIN;
+  const corsHandler = cors({
+    origin: allowedOrigin ? allowedOrigin.split(',').map((o: string) => o.trim()) : '*',
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization', 'CF-Access-Authenticated-User-Email'],
+  });
+  return corsHandler(c, next);
+});
 
 app.use('/api/*', rateLimit(300, 60000));
 app.use('/api/products/*', authMiddleware);

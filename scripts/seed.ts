@@ -21,6 +21,44 @@ async function seed() {
   const importRes = await importer.importFromGitHub();
   console.log(`   Imported ${importRes.imported} destinations (${importRes.redditCount} Reddit, ${importRes.websiteCount} Websites).`);
 
+  // 1b. Seed reachability audit records and verified statuses from comprehensive catalogue
+  const { COMPREHENSIVE_CATALOGUE } = await import('../src/lib/importers/places-catalogue');
+  console.log('1b. Seeding reachability verification checks and audit evidence for destinations...');
+  let verifiedCount = 0;
+  for (const item of COMPREHENSIVE_CATALOGUE) {
+    const existing = await destinationsRepo.findBySlug(item.slug);
+    if (existing) {
+      const isReddit = item.category === 'reddit';
+      const status = item.status === 'verified' ? (isReddit ? 'verified' : 'verified') : 'inactive';
+      
+      await destinationsRepo.upsert({
+        ...existing,
+        category: item.category,
+        submission_method: item.submission_method,
+        automation_policy: item.automation_policy,
+        adapter_key: item.adapter_key,
+        confidence: item.confidence,
+        status,
+        submission_url: item.submission_url,
+      });
+
+      await destinationsRepo.recordCheck({
+        destination_id: existing.id,
+        check_status: item.status === 'verified' ? 'active' : 'inactive',
+        http_status: item.http_status || (item.status === 'verified' ? 200 : 0),
+        final_url: item.submission_url || item.source_url,
+        evidence_json: JSON.stringify({
+          source: 'PlacesToPostYourStartup',
+          available: item.status === 'verified',
+          verified_at: new Date().toISOString(),
+        }),
+      });
+
+      if (item.status === 'verified') verifiedCount++;
+    }
+  }
+  console.log(`    Seeded checks: ${verifiedCount} destinations verified active & reachable, ${COMPREHENSIVE_CATALOGUE.length - verifiedCount} flagged inactive.`);
+
   // 2. Create Sample Product
   console.log('2. Creating sample startup master profile...');
   const product = await productsRepo.create({

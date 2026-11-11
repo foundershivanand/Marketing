@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { getDatabase } from '../../lib/database/db';
 import { CampaignsRepository } from '../../lib/database/campaigns.repo';
+import { DestinationsRepository } from '../../lib/database/destinations.repo';
+import { ProductsRepository } from '../../lib/database/products.repo';
 import { SubmissionsRepository } from '../../lib/database/submissions.repo';
 import { SubmissionWorkflow } from '../workflows/submission.workflow';
 import { DeadLetterQueueRepository } from '../../lib/database/dlq.repo';
@@ -54,6 +56,37 @@ submissionsRouter.get('/', async (c) => {
 
   const res = await db.prepare(sql).bind(...params).all();
   return c.json(res.results || []);
+});
+
+// Detailed Target State & Content Variant Inspector
+submissionsRouter.get('/targets/:id', async (c) => {
+  const db = getDatabase(c.env);
+  const campaignsRepo = new CampaignsRepository(db);
+  const destinationsRepo = new DestinationsRepository(db);
+  const productsRepo = new ProductsRepository(db);
+  const submissionsRepo = new SubmissionsRepository(db);
+
+  const targetId = c.req.param('id');
+  const target = await campaignsRepo.findTargetById(targetId);
+  if (!target) {
+    return c.json({ error: 'Target not found' }, 404);
+  }
+
+  const destination = await destinationsRepo.findById(target.destination_id);
+  const campaign = await campaignsRepo.findById(target.campaign_id);
+  const product = campaign ? await productsRepo.findById(campaign.product_id) : null;
+  const content = await campaignsRepo.getContentVariant(targetId);
+  const attempts = await submissionsRepo.listAttemptsByTarget(targetId);
+
+  return c.json({
+    target,
+    destination,
+    campaign,
+    product,
+    content,
+    attempts,
+    latestAttempt: attempts[0] || null,
+  });
 });
 
 // Dead Letter Queue (DLQ) Management Endpoints

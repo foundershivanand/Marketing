@@ -4,12 +4,25 @@
  * Uses standard Web Crypto API compatible with Cloudflare Workers and Node.js.
  */
 
+function resolveSecret(secretKey?: string): string {
+  const secret = secretKey || process.env.ENCRYPTION_KEY;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('ENCRYPTION_KEY environment variable is strictly required in production mode.');
+    }
+    // Safe deterministic key strictly for non-production development/testing
+    return 'launchpilot_dev_test_encryption_key_deterministic_2026';
+  }
+  return secret;
+}
+
 async function getKey(secret: string): Promise<CryptoKey> {
   const enc = new TextEncoder();
-  const rawKey = enc.encode(secret.padEnd(32, '0').slice(0, 32));
+  // Derive a cryptographically uniform 256-bit key via SHA-256 digest
+  const keyMaterial = await crypto.subtle.digest('SHA-256', enc.encode(secret));
   return await crypto.subtle.importKey(
     'raw',
-    rawKey,
+    keyMaterial,
     { name: 'AES-GCM' },
     false,
     ['encrypt', 'decrypt']
@@ -17,7 +30,7 @@ async function getKey(secret: string): Promise<CryptoKey> {
 }
 
 export async function encryptText(plaintext: string, secretKey?: string): Promise<string> {
-  const secret = secretKey || process.env.ENCRYPTION_KEY || 'default_launchpilot_fallback_key_32';
+  const secret = resolveSecret(secretKey);
   const key = await getKey(secret);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const enc = new TextEncoder();
@@ -37,7 +50,7 @@ export async function encryptText(plaintext: string, secretKey?: string): Promis
 }
 
 export async function decryptText(encryptedBase64: string, secretKey?: string): Promise<string> {
-  const secret = secretKey || process.env.ENCRYPTION_KEY || 'default_launchpilot_fallback_key_32';
+  const secret = resolveSecret(secretKey);
   const key = await getKey(secret);
   const combined = Buffer.from(encryptedBase64, 'base64');
   const iv = combined.subarray(0, 12);

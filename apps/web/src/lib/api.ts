@@ -93,6 +93,7 @@ export const api = {
     params.append('limit', String(limit));
     return fetchJson<any[]>(`/submissions?${params.toString()}`);
   },
+  getTargetDetail: (id: string) => fetchJson<any>(`/submissions/targets/${id}`),
   executeTarget: (id: string) => fetchJson<any>(`/submissions/targets/${id}/execute`, { method: 'POST' }),
   retryTarget: (id: string) => fetchJson<any>(`/submissions/targets/${id}/retry`, { method: 'POST' }),
   interveneTarget: (id: string, data: any) => fetchJson<any>(`/submissions/targets/${id}/intervention`, { method: 'POST', body: JSON.stringify(data) }),
